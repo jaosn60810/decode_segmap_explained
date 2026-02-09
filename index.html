@@ -1,0 +1,944 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>decode_segmap() Explained - Interactive Visualization</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: linear-gradient(135deg, #0f0f23 0%, #1a1a3e 100%);
+            min-height: 100vh;
+            color: #fff;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            text-align: center;
+            font-size: 2.2rem;
+            margin-bottom: 10px;
+            background: linear-gradient(90deg, #00d4ff, #00ff88);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #888;
+            margin-bottom: 30px;
+            font-size: 1rem;
+        }
+
+        /* Code Display */
+        .code-section {
+            background: #1e1e3f;
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 30px;
+            border: 1px solid rgba(255,255,255,0.1);
+            overflow-x: auto;
+        }
+
+        .code-section h3 {
+            color: #00d4ff;
+            margin-bottom: 15px;
+            font-size: 1.1rem;
+        }
+
+        pre {
+            font-family: 'Fira Code', 'Monaco', 'Consolas', monospace;
+            font-size: 0.85rem;
+            line-height: 1.6;
+            color: #e0e0e0;
+        }
+
+        .keyword { color: #c792ea; }
+        .function { color: #82aaff; }
+        .number { color: #f78c6c; }
+        .string { color: #c3e88d; }
+        .comment { color: #546e7a; }
+        .variable { color: #ffcb6b; }
+
+        /* Main Layout */
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+
+        @media (max-width: 1000px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .panel {
+            background: rgba(255,255,255,0.05);
+            border-radius: 15px;
+            padding: 25px;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .panel h3 {
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 1.2rem;
+        }
+
+        /* Color Legend */
+        .color-legend {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+            margin-bottom: 20px;
+        }
+
+        @media (max-width: 500px) {
+            .color-legend {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 0.75rem;
+        }
+
+        .legend-item:hover {
+            background: rgba(255,255,255,0.1);
+            transform: scale(1.02);
+        }
+
+        .legend-item.active {
+            outline: 2px solid #00d4ff;
+        }
+
+        .legend-color {
+            width: 24px;
+            height: 24px;
+            border-radius: 4px;
+            flex-shrink: 0;
+        }
+
+        .legend-info {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .legend-index {
+            font-weight: bold;
+            color: #00d4ff;
+        }
+
+        .legend-name {
+            color: #aaa;
+            font-size: 0.7rem;
+        }
+
+        /* Grid Displays */
+        .grid-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .grid-label {
+            font-weight: 600;
+            color: #00d4ff;
+            font-size: 0.9rem;
+        }
+
+        .pixel-grid {
+            display: grid;
+            gap: 2px;
+            background: #000;
+            padding: 2px;
+            border-radius: 8px;
+        }
+
+        .pixel {
+            width: 35px;
+            height: 35px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.7rem;
+            font-weight: bold;
+            border-radius: 3px;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .pixel:hover {
+            transform: scale(1.1);
+            z-index: 10;
+        }
+
+        .pixel.input-pixel {
+            background: #2a2a4a;
+            color: #fff;
+        }
+
+        .pixel.output-pixel {
+            color: #000;
+            text-shadow: 0 0 2px rgba(255,255,255,0.5);
+        }
+
+        /* Process Flow */
+        .process-section {
+            background: rgba(255,255,255,0.05);
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 30px;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .process-section h3 {
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .process-flow {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+            flex-wrap: wrap;
+            margin: 30px 0;
+        }
+
+        .process-step {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .step-box {
+            padding: 15px 20px;
+            border-radius: 10px;
+            text-align: center;
+            min-width: 100px;
+        }
+
+        .step-box.input {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+        }
+
+        .step-box.channel {
+            background: linear-gradient(135deg, #f093fb, #f5576c);
+        }
+
+        .step-box.output {
+            background: linear-gradient(135deg, #11998e, #38ef7d);
+        }
+
+        .step-label {
+            font-size: 0.8rem;
+            color: #aaa;
+        }
+
+        .arrow {
+            font-size: 1.5rem;
+            color: #666;
+        }
+
+        /* Channel Display */
+        .channels-display {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            flex-wrap: wrap;
+            margin: 20px 0;
+        }
+
+        .channel-box {
+            text-align: center;
+        }
+
+        .channel-label {
+            font-weight: bold;
+            margin-bottom: 10px;
+            padding: 5px 15px;
+            border-radius: 15px;
+            display: inline-block;
+        }
+
+        .channel-label.red { background: rgba(255,0,0,0.3); color: #ff6b6b; }
+        .channel-label.green { background: rgba(0,255,0,0.3); color: #51cf66; }
+        .channel-label.blue { background: rgba(0,0,255,0.3); color: #74c0fc; }
+
+        .channel-grid {
+            display: grid;
+            gap: 2px;
+            background: #000;
+            padding: 2px;
+            border-radius: 8px;
+        }
+
+        .channel-pixel {
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.6rem;
+            font-weight: bold;
+            border-radius: 2px;
+            color: #fff;
+        }
+
+        /* Controls */
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            flex-wrap: wrap;
+            margin: 20px 0;
+        }
+
+        .btn {
+            padding: 12px 25px;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 0.95rem;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .btn:hover {
+            transform: scale(1.05);
+        }
+
+        .btn-primary {
+            background: linear-gradient(90deg, #00d4ff, #00ff88);
+            color: #000;
+        }
+
+        .btn-secondary {
+            background: linear-gradient(90deg, #f093fb, #f5576c);
+            color: #fff;
+        }
+
+        .btn-outline {
+            background: transparent;
+            border: 2px solid #00d4ff;
+            color: #00d4ff;
+        }
+
+        /* Explanation Box */
+        .explanation {
+            background: linear-gradient(90deg, rgba(0,212,255,0.1), rgba(0,255,136,0.1));
+            border-left: 4px solid #00d4ff;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 0 10px 10px 0;
+        }
+
+        .explanation h4 {
+            color: #00d4ff;
+            margin-bottom: 10px;
+        }
+
+        .explanation p {
+            line-height: 1.6;
+            color: #ccc;
+        }
+
+        .explanation code {
+            background: rgba(0,0,0,0.3);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: monospace;
+            color: #ffcb6b;
+        }
+
+        /* Step by Step Section */
+        .step-section {
+            background: rgba(255,255,255,0.03);
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 20px;
+            border: 1px solid rgba(255,255,255,0.08);
+        }
+
+        .step-header {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+
+        .step-number {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #00d4ff, #00ff88);
+            color: #000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 1.2rem;
+        }
+
+        .step-title {
+            font-size: 1.1rem;
+            color: #fff;
+        }
+
+        .step-content {
+            margin-left: 55px;
+            color: #aaa;
+            line-height: 1.6;
+        }
+
+        /* Animation highlight */
+        .highlight {
+            animation: pulse 0.5s ease;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.2); }
+            100% { transform: scale(1); }
+        }
+
+        /* Status display */
+        .status-bar {
+            background: rgba(0,0,0,0.3);
+            padding: 15px 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+            text-align: center;
+            font-family: monospace;
+        }
+
+        .status-bar .current-class {
+            color: #00ff88;
+            font-weight: bold;
+        }
+
+        /* Grids side by side */
+        .grids-row {
+            display: flex;
+            justify-content: center;
+            gap: 50px;
+            flex-wrap: wrap;
+            margin: 30px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎨 decode_segmap() Explained</h1>
+        <p class="subtitle">How to convert class labels into a colorful RGB segmentation map</p>
+
+        <!-- Code Display -->
+        <div class="code-section">
+            <h3>📝 The Function</h3>
+            <pre><code><span class="keyword">def</span> <span class="function">decode_segmap</span>(image, nc=<span class="number">21</span>):
+    <span class="comment"># Step 1: Define colors for each class (21 classes total)</span>
+    <span class="variable">label_colors</span> = np.array([
+        (<span class="number">0</span>, <span class="number">0</span>, <span class="number">0</span>),        <span class="comment"># 0 = background (black)</span>
+        (<span class="number">128</span>, <span class="number">0</span>, <span class="number">0</span>),      <span class="comment"># 1 = aeroplane</span>
+        (<span class="number">0</span>, <span class="number">128</span>, <span class="number">0</span>),      <span class="comment"># 2 = bicycle</span>
+        (<span class="number">128</span>, <span class="number">128</span>, <span class="number">0</span>),    <span class="comment"># 3 = bird ...</span>
+    ])
+    
+    <span class="comment"># Step 2: Create empty R, G, B channels</span>
+    <span class="variable">r</span> = np.zeros_like(image).astype(np.uint8)
+    <span class="variable">g</span> = np.zeros_like(image).astype(np.uint8)
+    <span class="variable">b</span> = np.zeros_like(image).astype(np.uint8)
+    
+    <span class="comment"># Step 3: Loop through each class and fill colors</span>
+    <span class="keyword">for</span> l <span class="keyword">in</span> <span class="function">range</span>(<span class="number">0</span>, nc):
+        idx = image == l              <span class="comment"># Find pixels with this class</span>
+        r[idx] = label_colors[l, <span class="number">0</span>]   <span class="comment"># Fill R channel</span>
+        g[idx] = label_colors[l, <span class="number">1</span>]   <span class="comment"># Fill G channel</span>
+        b[idx] = label_colors[l, <span class="number">2</span>]   <span class="comment"># Fill B channel</span>
+    
+    <span class="comment"># Step 4: Stack channels to form RGB image</span>
+    <span class="variable">rgb</span> = np.<span class="function">stack</span>([r, g, b], axis=<span class="number">2</span>)
+    <span class="keyword">return</span> rgb</code></pre>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Left: Color Legend -->
+            <div class="panel">
+                <h3>🎨 Color Mapping (label_colors)</h3>
+                <p style="color: #888; margin-bottom: 15px; font-size: 0.85rem;">Click any class to highlight it in the grids below</p>
+                <div class="color-legend" id="colorLegend"></div>
+            </div>
+
+            <!-- Right: Input/Output Grids -->
+            <div class="panel">
+                <h3>🖼️ Input → Output</h3>
+                <div class="grids-row">
+                    <div class="grid-container">
+                        <div class="grid-label">Input: Class Labels [8×8]</div>
+                        <div class="pixel-grid" id="inputGrid" style="grid-template-columns: repeat(8, 1fr);"></div>
+                    </div>
+                    <div style="font-size: 2rem; color: #666; align-self: center;">→</div>
+                    <div class="grid-container">
+                        <div class="grid-label">Output: RGB Image [8×8×3]</div>
+                        <div class="pixel-grid" id="outputGrid" style="grid-template-columns: repeat(8, 1fr);"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Process Flow -->
+        <div class="process-section">
+            <h3>⚙️ The Process: How It Works</h3>
+            
+            <div class="process-flow">
+                <div class="process-step">
+                    <div class="step-box input">
+                        <div style="font-size: 1.5rem;">📊</div>
+                        <div>Input</div>
+                    </div>
+                    <div class="step-label">[H × W]<br>Class labels<br>(0-20)</div>
+                </div>
+                
+                <div class="arrow">→</div>
+                
+                <div class="process-step">
+                    <div class="step-box channel" style="background: linear-gradient(135deg, #ff6b6b, #c92a2a);">
+                        <div style="font-size: 1.5rem;">🔴</div>
+                        <div>R</div>
+                    </div>
+                    <div class="step-label">[H × W]<br>Red values</div>
+                </div>
+                
+                <div class="process-step">
+                    <div class="step-box channel" style="background: linear-gradient(135deg, #51cf66, #2f9e44);">
+                        <div style="font-size: 1.5rem;">🟢</div>
+                        <div>G</div>
+                    </div>
+                    <div class="step-label">[H × W]<br>Green values</div>
+                </div>
+                
+                <div class="process-step">
+                    <div class="step-box channel" style="background: linear-gradient(135deg, #74c0fc, #1c7ed6);">
+                        <div style="font-size: 1.5rem;">🔵</div>
+                        <div>B</div>
+                    </div>
+                    <div class="step-label">[H × W]<br>Blue values</div>
+                </div>
+                
+                <div class="arrow">→</div>
+                
+                <div class="process-step">
+                    <div class="step-box output">
+                        <div style="font-size: 1.5rem;">🖼️</div>
+                        <div>RGB</div>
+                    </div>
+                    <div class="step-label">[H × W × 3]<br>Color image</div>
+                </div>
+            </div>
+
+            <!-- Controls -->
+            <div class="controls">
+                <button class="btn btn-primary" onclick="animateStep()">▶️ Animate Step by Step</button>
+                <button class="btn btn-secondary" onclick="animateAll()">⚡ Quick Animation</button>
+                <button class="btn btn-outline" onclick="resetGrids()">🔄 Reset</button>
+            </div>
+
+            <!-- Status Bar -->
+            <div class="status-bar" id="statusBar">
+                Ready to animate. Press a button above!
+            </div>
+
+            <!-- RGB Channels -->
+            <h4 style="text-align: center; margin: 30px 0 20px; color: #888;">Individual RGB Channels</h4>
+            <div class="channels-display">
+                <div class="channel-box">
+                    <div class="channel-label red">R Channel</div>
+                    <div class="channel-grid" id="rChannel" style="grid-template-columns: repeat(8, 1fr);"></div>
+                </div>
+                <div class="channel-box">
+                    <div class="channel-label green">G Channel</div>
+                    <div class="channel-grid" id="gChannel" style="grid-template-columns: repeat(8, 1fr);"></div>
+                </div>
+                <div class="channel-box">
+                    <div class="channel-label blue">B Channel</div>
+                    <div class="channel-grid" id="bChannel" style="grid-template-columns: repeat(8, 1fr);"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Step by Step Explanation -->
+        <div class="step-section">
+            <div class="step-header">
+                <div class="step-number">1</div>
+                <div class="step-title">Define the Color Palette</div>
+            </div>
+            <div class="step-content">
+                <p><code>label_colors</code> is an array that maps each class index (0-20) to an RGB color.</p>
+                <p style="margin-top: 10px;">For example: Class <code>0</code> (background) → <code>(0, 0, 0)</code> black, Class <code>3</code> (bird) → <code>(128, 128, 0)</code> olive yellow</p>
+            </div>
+        </div>
+
+        <div class="step-section">
+            <div class="step-header">
+                <div class="step-number">2</div>
+                <div class="step-title">Create Empty R, G, B Channels</div>
+            </div>
+            <div class="step-content">
+                <p>Create three 2D arrays (<code>r</code>, <code>g</code>, <code>b</code>) with the same shape as the input, all filled with zeros.</p>
+                <p style="margin-top: 10px;">Each array will hold one color channel of the final RGB image.</p>
+            </div>
+        </div>
+
+        <div class="step-section">
+            <div class="step-header">
+                <div class="step-number">3</div>
+                <div class="step-title">Loop Through Each Class</div>
+            </div>
+            <div class="step-content">
+                <p>For each class <code>l</code> from 0 to 20:</p>
+                <ul style="margin: 10px 0 10px 20px; color: #ccc;">
+                    <li><code>idx = image == l</code> — Find all pixels where the class label equals <code>l</code></li>
+                    <li><code>r[idx] = label_colors[l, 0]</code> — Set the R value for those pixels</li>
+                    <li><code>g[idx] = label_colors[l, 1]</code> — Set the G value for those pixels</li>
+                    <li><code>b[idx] = label_colors[l, 2]</code> — Set the B value for those pixels</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="step-section">
+            <div class="step-header">
+                <div class="step-number">4</div>
+                <div class="step-title">Stack Channels into RGB Image</div>
+            </div>
+            <div class="step-content">
+                <p><code>np.stack([r, g, b], axis=2)</code> combines the three [H×W] arrays into one [H×W×3] RGB image.</p>
+                <p style="margin-top: 10px;">Now every pixel has 3 values (R, G, B) that form a visible color!</p>
+            </div>
+        </div>
+
+        <!-- Key Takeaway -->
+        <div class="explanation">
+            <h4>💡 Key Takeaway</h4>
+            <p>The function takes a 2D array of class labels (like <code>[0, 3, 0, 3, ...]</code>) and converts each number into its corresponding RGB color. This makes the segmentation result <strong>visually interpretable</strong> — instead of seeing numbers, you see colors!</p>
+        </div>
+    </div>
+
+    <script>
+        // Class colors from PASCAL VOC
+        const labelColors = [
+            { name: 'background', color: [0, 0, 0] },
+            { name: 'aeroplane', color: [128, 0, 0] },
+            { name: 'bicycle', color: [0, 128, 0] },
+            { name: 'bird', color: [128, 128, 0] },
+            { name: 'boat', color: [0, 0, 128] },
+            { name: 'bottle', color: [128, 0, 128] },
+            { name: 'bus', color: [0, 128, 128] },
+            { name: 'car', color: [128, 128, 128] },
+            { name: 'cat', color: [64, 0, 0] },
+            { name: 'chair', color: [192, 0, 0] },
+            { name: 'cow', color: [64, 128, 0] },
+            { name: 'table', color: [192, 128, 0] },
+            { name: 'dog', color: [64, 0, 128] },
+            { name: 'horse', color: [192, 0, 128] },
+            { name: 'motorbike', color: [64, 128, 128] },
+            { name: 'person', color: [192, 128, 128] },
+            { name: 'plant', color: [0, 64, 0] },
+            { name: 'sheep', color: [128, 64, 0] },
+            { name: 'sofa', color: [0, 192, 0] },
+            { name: 'train', color: [128, 192, 0] },
+            { name: 'tv', color: [0, 64, 128] }
+        ];
+
+        // Sample input: 8x8 grid with bird (3) pattern
+        const inputData = [
+            [0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 3, 3, 0, 0, 0],
+            [0, 0, 3, 3, 3, 3, 0, 0],
+            [0, 3, 3, 3, 3, 3, 3, 0],
+            [0, 3, 3, 3, 3, 3, 3, 0],
+            [0, 0, 3, 3, 3, 3, 0, 0],
+            [0, 0, 0, 3, 3, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0]
+        ];
+
+        // State
+        let rChannel = Array(8).fill().map(() => Array(8).fill(0));
+        let gChannel = Array(8).fill().map(() => Array(8).fill(0));
+        let bChannel = Array(8).fill().map(() => Array(8).fill(0));
+        let selectedClass = null;
+        let animating = false;
+
+        // Initialize
+        function init() {
+            createColorLegend();
+            createInputGrid();
+            createOutputGrid();
+            createChannelGrids();
+        }
+
+        function createColorLegend() {
+            const container = document.getElementById('colorLegend');
+            container.innerHTML = '';
+            
+            labelColors.forEach((item, index) => {
+                const div = document.createElement('div');
+                div.className = 'legend-item';
+                div.onclick = () => highlightClass(index);
+                
+                const colorStr = `rgb(${item.color[0]}, ${item.color[1]}, ${item.color[2]})`;
+                div.innerHTML = `
+                    <div class="legend-color" style="background: ${colorStr}; ${index === 0 ? 'border: 1px solid #444;' : ''}"></div>
+                    <div class="legend-info">
+                        <span class="legend-index">${index}</span>
+                        <span class="legend-name">${item.name}</span>
+                    </div>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        function createInputGrid() {
+            const container = document.getElementById('inputGrid');
+            container.innerHTML = '';
+            
+            for (let i = 0; i < 8; i++) {
+                for (let j = 0; j < 8; j++) {
+                    const pixel = document.createElement('div');
+                    pixel.className = 'pixel input-pixel';
+                    pixel.id = `input-${i}-${j}`;
+                    pixel.textContent = inputData[i][j];
+                    pixel.onclick = () => highlightClass(inputData[i][j]);
+                    container.appendChild(pixel);
+                }
+            }
+        }
+
+        function createOutputGrid() {
+            const container = document.getElementById('outputGrid');
+            container.innerHTML = '';
+            
+            for (let i = 0; i < 8; i++) {
+                for (let j = 0; j < 8; j++) {
+                    const pixel = document.createElement('div');
+                    pixel.className = 'pixel output-pixel';
+                    pixel.id = `output-${i}-${j}`;
+                    pixel.style.background = '#000';
+                    container.appendChild(pixel);
+                }
+            }
+        }
+
+        function createChannelGrids() {
+            ['rChannel', 'gChannel', 'bChannel'].forEach(channelId => {
+                const container = document.getElementById(channelId);
+                container.innerHTML = '';
+                
+                for (let i = 0; i < 8; i++) {
+                    for (let j = 0; j < 8; j++) {
+                        const pixel = document.createElement('div');
+                        pixel.className = 'channel-pixel';
+                        pixel.id = `${channelId}-${i}-${j}`;
+                        pixel.textContent = '0';
+                        pixel.style.background = '#111';
+                        container.appendChild(pixel);
+                    }
+                }
+            });
+        }
+
+        function highlightClass(classIndex) {
+            // Update legend
+            document.querySelectorAll('.legend-item').forEach((item, idx) => {
+                item.classList.toggle('active', idx === classIndex);
+            });
+
+            // Highlight input pixels
+            for (let i = 0; i < 8; i++) {
+                for (let j = 0; j < 8; j++) {
+                    const inputPixel = document.getElementById(`input-${i}-${j}`);
+                    if (inputData[i][j] === classIndex) {
+                        inputPixel.style.background = '#00d4ff';
+                        inputPixel.style.color = '#000';
+                    } else {
+                        inputPixel.style.background = '#2a2a4a';
+                        inputPixel.style.color = '#fff';
+                    }
+                }
+            }
+
+            selectedClass = classIndex;
+            updateStatus(`Selected class ${classIndex} (${labelColors[classIndex].name})`);
+        }
+
+        function updateStatus(message) {
+            document.getElementById('statusBar').innerHTML = message;
+        }
+
+        function resetGrids() {
+            rChannel = Array(8).fill().map(() => Array(8).fill(0));
+            gChannel = Array(8).fill().map(() => Array(8).fill(0));
+            bChannel = Array(8).fill().map(() => Array(8).fill(0));
+
+            for (let i = 0; i < 8; i++) {
+                for (let j = 0; j < 8; j++) {
+                    document.getElementById(`output-${i}-${j}`).style.background = '#000';
+                    
+                    ['rChannel', 'gChannel', 'bChannel'].forEach(ch => {
+                        const pixel = document.getElementById(`${ch}-${i}-${j}`);
+                        pixel.textContent = '0';
+                        pixel.style.background = '#111';
+                    });
+
+                    const inputPixel = document.getElementById(`input-${i}-${j}`);
+                    inputPixel.style.background = '#2a2a4a';
+                    inputPixel.style.color = '#fff';
+                }
+            }
+
+            document.querySelectorAll('.legend-item').forEach(item => item.classList.remove('active'));
+            selectedClass = null;
+            animating = false;
+            updateStatus('Reset complete. Ready to animate!');
+        }
+
+        async function animateStep() {
+            if (animating) return;
+            animating = true;
+            resetGrids();
+            await sleep(300);
+
+            // Find unique classes in input
+            const uniqueClasses = [...new Set(inputData.flat())].sort((a, b) => a - b);
+
+            for (const classIdx of uniqueClasses) {
+                const color = labelColors[classIdx].color;
+                const className = labelColors[classIdx].name;
+                
+                updateStatus(`Processing class <span class="current-class">${classIdx}</span> (${className}) → RGB(${color[0]}, ${color[1]}, ${color[2]})`);
+                
+                // Highlight this class in legend
+                document.querySelectorAll('.legend-item').forEach((item, idx) => {
+                    item.classList.toggle('active', idx === classIdx);
+                });
+
+                // Find and color pixels of this class
+                for (let i = 0; i < 8; i++) {
+                    for (let j = 0; j < 8; j++) {
+                        if (inputData[i][j] === classIdx) {
+                            // Highlight input pixel
+                            const inputPixel = document.getElementById(`input-${i}-${j}`);
+                            inputPixel.classList.add('highlight');
+
+                            // Update channels
+                            rChannel[i][j] = color[0];
+                            gChannel[i][j] = color[1];
+                            bChannel[i][j] = color[2];
+
+                            // Update channel displays
+                            updateChannelPixel('rChannel', i, j, color[0], '#ff6b6b');
+                            updateChannelPixel('gChannel', i, j, color[1], '#51cf66');
+                            updateChannelPixel('bChannel', i, j, color[2], '#74c0fc');
+
+                            // Update output pixel
+                            const outputPixel = document.getElementById(`output-${i}-${j}`);
+                            outputPixel.style.background = `rgb(${color[0]}, ${color[1]}, ${color[2]})`;
+                            outputPixel.classList.add('highlight');
+
+                            await sleep(100);
+                            inputPixel.classList.remove('highlight');
+                            outputPixel.classList.remove('highlight');
+                        }
+                    }
+                }
+
+                await sleep(500);
+            }
+
+            updateStatus('✅ Complete! All pixels have been colored.');
+            animating = false;
+        }
+
+        async function animateAll() {
+            if (animating) return;
+            animating = true;
+            resetGrids();
+            await sleep(200);
+
+            updateStatus('⚡ Processing all pixels...');
+
+            for (let i = 0; i < 8; i++) {
+                for (let j = 0; j < 8; j++) {
+                    const classIdx = inputData[i][j];
+                    const color = labelColors[classIdx].color;
+
+                    rChannel[i][j] = color[0];
+                    gChannel[i][j] = color[1];
+                    bChannel[i][j] = color[2];
+
+                    updateChannelPixel('rChannel', i, j, color[0], '#ff6b6b');
+                    updateChannelPixel('gChannel', i, j, color[1], '#51cf66');
+                    updateChannelPixel('bChannel', i, j, color[2], '#74c0fc');
+
+                    const outputPixel = document.getElementById(`output-${i}-${j}`);
+                    outputPixel.style.background = `rgb(${color[0]}, ${color[1]}, ${color[2]})`;
+
+                    await sleep(30);
+                }
+            }
+
+            updateStatus('✅ Complete! All pixels have been colored.');
+            animating = false;
+        }
+
+        function updateChannelPixel(channelId, i, j, value, baseColor) {
+            const pixel = document.getElementById(`${channelId}-${i}-${j}`);
+            pixel.textContent = value;
+            
+            // Color intensity based on value
+            const intensity = value / 255;
+            if (channelId === 'rChannel') {
+                pixel.style.background = `rgba(255, 0, 0, ${Math.max(0.2, intensity)})`;
+            } else if (channelId === 'gChannel') {
+                pixel.style.background = `rgba(0, 255, 0, ${Math.max(0.2, intensity)})`;
+            } else {
+                pixel.style.background = `rgba(0, 100, 255, ${Math.max(0.2, intensity)})`;
+            }
+            pixel.style.color = intensity > 0.5 ? '#000' : '#fff';
+        }
+
+        function sleep(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
+        // Initialize on load
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>
